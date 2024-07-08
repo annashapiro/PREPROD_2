@@ -1,0 +1,255 @@
+---
+title: "preprod_2"
+format: html
+editor: visual
+---
+
+```{r warning = FALSE}
+library(readxl)
+library(xlsx)
+library(tidyverse)
+```
+
+# PREPROD_2: Pretest (1/2)
+
+This code generates a data frame which combines participants' data from two "tasks" on Gorilla: questionnaire-7o97 and questionnaire-os33 to be inputted in the [Participant profile spreadsheet](https://docs.google.com/spreadsheets/d/1EwXKN9MirbeHJuTWmaqw9xhok9KzF-1BIe5fo7_r13Q/edit?gid=0#gid=0) (Hoja 1). It's adapted from code made available by Drew McLaughlin during her [Pupillometry workshop](https://sites.google.com/view/drewjmclaughlin/pupillometry).
+
+## BCBL head (questionnaire-7o97)
+
+From this raw data we want to extract participants' ID, age and gender.
+
+```{r}
+# Set directory for raw data
+inputdir <- "C:/Users/annas/OneDrive/Desktop/BCBL/Preprod_2 (R, pretest)/7o97"
+
+# Get file names
+all_filepaths <- dir(path = inputdir, full.names = TRUE, pattern = '.xlsx', ignore.case=TRUE)
+
+# Get length of files for for-loop
+n_files <- length(all_filepaths)
+
+# This is where the data will go during the for-loop
+df_list <- list()
+
+for (this_file in 1:n_files){
+  
+  df <- read_excel(all_filepaths[this_file]) %>%
+    # If want to combine this and remember which task data came from, keep 'Task Name' column
+    select('Participant Public ID', 'Question', 'Response') %>%
+    # Only keep rows on age and gender
+    filter(Question == 'Edad' | str_detect(Question, "^Identidad")) %>%
+    # Make data tidy
+    pivot_wider(names_from = Question, values_from = Response) %>%
+    rename(Age = Edad,
+           Gender = starts_with("Identidad")) %>%
+    # As gender is free input, standardize it for spreadsheet
+    mutate(across(everything(), ~ {
+    . <- gsub("masculino", "M", .)
+    . <- gsub("Masculino", "M", .)
+    . <- gsub("MASCULINO", "M", .)
+    . <- gsub("Femenino", "F", .)
+    . <- gsub("femenino", "F", .)
+    . <- gsub("FEMENINO", "F", .)
+    return(.)
+  }))
+  
+  # Save result of for-loop for every file into list
+     df_list[[length(df_list) + 1]] <- df
+}
+
+# Combine all data frames in the list into one data frame
+merged_bcblhead <- bind_rows(df_list)
+```
+
+## Language questionnaire
+
+```{r}
+inputdir <- "C:/Users/annas/OneDrive/Desktop/BCBL/Preprod_2 (R, pretest)/os33"
+
+all_filepaths <- dir(path = inputdir, full.names = TRUE, pattern = '.xlsx', ignore.case=TRUE)
+
+n_files <- length(all_filepaths)
+
+df_list <- list()
+
+for (this_file in 1:n_files){
+  
+  df <- read_excel(all_filepaths[this_file]) %>%
+    
+    # Page 2 is language use, see chunk below
+    filter(Page == 'Page 1',
+           !is.na(Key)) %>%
+    select('Participant Public ID', 'Response', 'Object Name', 'Key') %>%
+    
+    # Tidy data
+    pivot_wider(names_from = 'Object Name', values_from = Response) %>%
+    
+    # Combine everything into one row without NAs
+    group_by('Participant Public ID') %>%
+    fill(everything(), .direction = "down") %>%
+    fill(everything(), .direction = "up") %>%
+    slice(1) %>%
+    ungroup() %>%
+    
+    # Drop unneeded columns
+    # Since Immersion_A, _B etc columns were dropped (Yes/No to Immersion), if a participant doesn't have any Immersion data it means Immersion_n was No
+    select(-Key, -'Number Entry', -(matches("^Immersion_[ABCDEF]$"))) %>%
+    
+    # Standardize languages
+    mutate(across(everything(), ~ {
+    . <- gsub("español", "ESP", .)
+    . <- gsub("Español", "ESP", .)
+    . <- gsub("ESPAÑOL", "ESP", .)
+    . <- gsub("castellano", "ESP", .)
+    . <- gsub("Castellano", "ESP", .)
+    . <- gsub("Catellano", "ESP", .)
+    . <- gsub("CASTELLANO", "ESP", .)
+    . <- gsub("Euskera", "EUS", .)
+    . <- gsub("euskera", "EUS", .)
+    . <- gsub("Eusker", "EUS", .)
+    . <- gsub("Euskara", "EUS", .)
+    . <- gsub("euskara", "EUS", .)
+    . <- gsub("EUSKERA", "EUS", .)
+    . <- gsub("EUSKARA", "EUS", .)
+    . <- gsub("inglés", "ENG", .)
+    . <- gsub("Inglés", "ENG", .)
+    . <- gsub("ingles", "ENG", .)
+    . <- gsub("Ingles", "ENG", .)
+    . <- gsub("Inglës", "ENG", .)
+    . <- gsub("INGLÉS", "ENG", .)
+    . <- gsub("INGLES", "ENG", .)
+    . <- gsub("francés", "FR", .)
+    . <- gsub("Francés", "FR", .)
+    . <- gsub("frances", "FR", .)
+    . <- gsub("Frances", "FR", .)
+    . <- gsub("FRANCÉS", "FR", .)
+    . <- gsub("FRANCES", "FR", .)
+    . <- gsub("Aleman", "DE", .)
+    . <- gsub("Alemán", "DE", .)
+    . <- gsub("aleman", "DE", .)
+    . <- gsub("Italiano", "IT", .)
+    . <- gsub("italiano", "IT", .)
+    . <- gsub("ITALIANO", "IT", .)
+    . <- gsub("LENGUA DE SIGNOS", "SIGN", .)
+    . <- gsub("Lengua de signos", "SIGN", .)
+    . <- gsub("lengua de signos", "SIGN", .)
+    . <- gsub("Turco", "TR", .)
+    . <- gsub("turco", "TR", .)
+    . <- gsub("rumano", "RO", .)
+    . <- gsub("Rumano", "RO", .)
+    . <- gsub("Japonés", "JP", .)
+    . <- gsub("Catalán", "CAT", .)
+    return(.)
+  }))
+  
+     df_list[[length(df_list) + 1]] <- df
+}
+
+# Combine all data frames in the list into one data frame
+merged_questionnaire <- bind_rows(df_list)
+```
+
+## Language use
+
+\_\_\_\_\_\_\_\_\_\_\_
+
+-   *1_Spanish/1_French: Con tu familia*
+
+-   *2_Spanish/2_French: Con tus amigos/as*
+
+-   *3_Spanish/3_French: En el trabajo o en la universidad*
+
+-   *4_Spanish/4_French: En supermercados, restaurantes y otros comercios*
+
+-\> oral production
+
+\_\_\_\_\_\_
+
+-   5_Spanish/5_French: Enviando correos o mensajes
+
+-   6_Spanish/6_French: Escribiendo la lista de la compra o notas
+
+-\> writing
+
+\_\_\_\_\_\_\_
+
+-   7_Spanish/7_French: Leyendo libros o revistas
+
+-   8_Spanish/8_French: En internet o redes sociales
+
+-\> reading
+
+\_\_\_\_\_\_\_
+
+-   9_Spanish/9_French: Cuando ves peliculas o series
+
+-   10_Spanish/10_French: Escuchando musica, radio o podcasts
+
+-\> listening
+
+```{r}
+df_list <- list()
+
+for (this_file in 1:n_files){
+  
+  df <- read_excel(all_filepaths[this_file]) %>%
+    # Page 1 is linguistic history, see chunk above
+    filter(Page == 'Page 2') %>%
+    
+    select('Participant Public ID', 'Task Name', 'Response', 'Object Name') %>%
+    
+    # Tidy data
+    pivot_wider(names_from = 'Object Name', values_from = Response) %>%
+    
+    # Prepare columns for calculation
+    mutate(across(matches("_Spanish$"), as.numeric),
+           across(matches("_French$"), as.numeric)) %>%
+    
+    # Calculate overall use per language by adding up relevant columns and dividing by col_num
+    mutate(overall_use_sp = rowSums(select(., ends_with("_Spanish"))) / 10,
+           overall_use_fr = rowSums(select(., ends_with("_French"))) / 10,
+           # Calculate oral usage per language using the columns for oral production, see text above chunk
+           oral_sp = rowSums(select(., c("1_Spanish", "2_Spanish", "3_Spanish", "4_Spanish"))) / 4,
+           oral_fr = rowSums(select(., c("1_French", "2_French", "3_French", "4_French"))) / 4) %>%
+    
+    # Drop unneeded columns
+    select('Participant Public ID', overall_use_sp, oral_sp, overall_use_fr, oral_fr)
+  
+     df_list[[length(df_list) + 1]] <- df
+}
+
+# Combine all data frames in the list into one data frame
+merged_languageuse <- bind_rows(df_list)
+```
+
+## Merge data
+
+```{r}
+# Merge all lists
+preprocessed_dfs <- list(merged_bcblhead, merged_questionnaire, merged_languageuse)
+# Merge into a data frame
+merged_df <- Reduce(cbind, preprocessed_dfs)
+
+# Save output as spreadsheet
+write.xlsx(merged_df, "merged.xlsx")
+```
+
+The only things that need to be done manually are:
+
+-   update the "standardizing" code lines (for gender or inputted languages) when come across unprecedented input
+
+-   "standardize" language immersion info:
+
+    -   Time period, City (Country), Year
+
+-   reshuffle order of languages: sometimes participants don't go by AoA order
+
+## Outtakes
+
+```{r}
+# Quantise Immersion_A/B/... responses
+    mutate(across(matches("^Immersion_[ABCDEF]$"), ~ case_when(
+      . == "Sí" ~ 1,
+      . == "No" ~ 0
+    )))
+```
