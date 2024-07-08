@@ -1,0 +1,83 @@
+---
+title: "prod_task"
+format: html
+editor: visual
+---
+
+# PREPROD_2: Pretest (2/2)
+
+This code generates a data frame which combines participants' data from the speed of production task on Gorilla (task-1jhx) to be inputted in the [Participant profile spreadsheet](https://docs.google.com/spreadsheets/d/1EwXKN9MirbeHJuTWmaqw9xhok9KzF-1BIe5fo7_r13Q/edit?gid=0#gid=0) (Hoja 1). It's adapted from code made available by Drew McLaughlin during her [Pupillometry workshop](https://sites.google.com/view/drewjmclaughlin/pupillometry).
+
+```{r}
+library(readxl)
+library(xlsx)
+library(tidyverse)
+```
+
+```{r}
+# Set directory for raw data
+inputdir <- "C:/Users/annas/OneDrive/Desktop/BCBL/Preprod_2 (R, pretest)/prod_task/data"
+
+# Get file names
+all_filepaths <- dir(path = inputdir, full.names = TRUE, pattern = '.xlsx', ignore.case=TRUE)
+
+# Get length of files for for-loop
+n_files <- length(all_filepaths)
+
+# This is where the data will go during the for-loop
+df_list <- list()
+
+for (this_file in 1:n_files){
+  
+  df <- read_excel(all_filepaths[this_file]) %>%
+    # Columns of interest
+    select('Participant Public ID', 'Reaction Time', 'Tag', 'Spreadsheet: Sentence item', 'Spreadsheet: Answer', 'Object Name', 'Spreadsheet: display') %>%
+    
+    # Ignore datapoints of instructions, practice, debriefing etc
+  filter(str_detect(`Spreadsheet: display`, "^Test")) %>%
+    
+    # Assimilate to Excel spreadsheet
+  mutate(
+    Language = case_when(
+      (str_detect(`Spreadsheet: display`, "SP$")) ~ "Spanish",
+      (str_detect(`Spreadsheet: display`, "FR$")) ~ "French"),
+    Answer = case_when(
+      tolower(`Tag`) == tolower(`Spreadsheet: Answer`) ~ "Correct",
+      tolower(`Tag`) != tolower(`Spreadsheet: Answer`) ~ "Incorrect")) %>%
+  rename(
+    'Sentence item' = 'Spreadsheet: Sentence item',
+    'RT (Question)' = 'Reaction Time',
+    'Gorilla ID' = 'Participant Public ID') %>%
+    
+    # Get one row per item (comprehension question responses are repeated for every datapoint of a participant)
+    group_by(`Sentence item`) %>%
+    mutate(
+      Answer = first(Answer[!is.na(Answer)])) %>%
+    ungroup() %>%
+    # Only keep row containing speed of comprehension questions
+    filter(`Object Name` == "Response") %>%
+    
+  # Drop unneeded columns
+    select('Gorilla ID', 'Sentence item', 'Language', 'Answer', 'RT (Question)')
+  
+  # Save result of for-loop for every file into list
+     df_list[[length(df_list) + 1]] <- df
+}
+
+# Combine all data frames in the list into one data frame
+merged_prodtask <- bind_rows(df_list)
+
+# Save output as spreadsheet
+write.xlsx(merged_prodtask, "merged_prodtask.xlsx")
+```
+
+```{r}
+# To keep Practice trials
+#str_detect(p1$`Spreadsheet: display`, "^Practice") | 
+```
+
+## Notes
+
+-   Object Name == Delay Onset
+
+Roughly aligns with length of audio recording, i.e is the raw duration of participants' audio (without taking into account mouse clicking, sentence-unrelated talk and silence) up until the point they click 'I am done'
